@@ -8,9 +8,10 @@ import { EventTarget } from "event-target-shim";
 import { ExitReason } from "./react-components/room/ExitedRoomScreen";
 import { LogMessageType } from "./react-components/room/ChatSidebar";
 import { createNetworkedEntity } from "./utils/create-networked-entity";
-import qsTruthy from "./utils/qs_truthy";
 import { add, testAsset, respawn } from "./utils/chat-commands";
 import { isLockedDownDemoRoom } from "./utils/hub-utils";
+import { loadState, clearState } from "./utils/entity-state-utils";
+import { shouldUseNewLoader } from "./utils/bit-utils";
 
 let uiRoot;
 // Handles user-entered messages
@@ -140,15 +141,9 @@ export default class MessageDispatch extends EventTarget {
         }
         break;
       case "duck":
-        if (qsTruthy("newLoader")) {
+        if (shouldUseNewLoader()) {
           const avatarPov = document.querySelector("#avatar-pov-node").object3D;
-          const eid = createNetworkedEntity(APP.world, "media", {
-            src: getAbsoluteHref(location.href, ducky),
-            resize: true,
-            recenter: true,
-            animateLoad: true,
-            isObjectMenuTarget: true
-          });
+          const eid = createNetworkedEntity(APP.world, "duck");
           const obj = APP.world.eid2obj.get(eid);
           obj.position.copy(avatarPov.localToWorld(new THREE.Vector3(0, 0, -1.5)));
           obj.lookAt(avatarPov.getWorldPosition(new THREE.Vector3()));
@@ -257,6 +252,20 @@ export default class MessageDispatch extends EventTarget {
         {
           const avatarPov = document.querySelector("#avatar-pov-node").object3D;
           testAsset(APP.world, avatarPov, args);
+        }
+        break;
+      case "load":
+        {
+          if (this.hubChannel.can("pin_objects") && this.hubChannel.signIn) {
+            loadState(this.hubChannel, APP.world, args);
+          }
+        }
+        break;
+      case "clear":
+        {
+          if (this.hubChannel.can("pin_objects") && this.hubChannel.signIn) {
+            clearState(this.hubChannel, APP.world);
+          }
         }
         break;
     }

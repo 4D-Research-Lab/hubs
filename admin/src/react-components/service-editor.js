@@ -270,7 +270,6 @@ class ConfigurationEditor extends Component {
           key={displayPath}
           id={displayPath}
           label={name || displayPath}
-          inputProps={{ maxLength: 4096 }}
           value={currentValue || (isTheme && !this.state.isDirty && JSON.stringify(theme, null, 2)) || ""}
           onChange={ev => {
             const value = ev.target.value;
@@ -460,6 +459,7 @@ class ConfigurationEditor extends Component {
               className={this.props.classes.button}
               variant="contained"
               color="primary"
+              disabled={this.state.warningMessage}
             >
               Save
             </Button>

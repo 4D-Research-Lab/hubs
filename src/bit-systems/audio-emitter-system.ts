@@ -1,13 +1,7 @@
 import { addComponent, addEntity, defineQuery, removeComponent } from "bitecs";
-import {
-  PositionalAudio,
-  Audio as StereoAudio,
-  AudioListener as ThreeAudioListener,
-  MeshStandardMaterial,
-  Mesh
-} from "three";
+import { PositionalAudio, Audio as StereoAudio, AudioListener as ThreeAudioListener } from "three";
 import { HubsWorld } from "../app";
-import { AudioEmitter, AudioSettingsChanged } from "../bit-components";
+import { AudioEmitter, AudioSettingsChanged, MediaVideoData } from "../bit-components";
 import { AudioType, SourceType } from "../components/audio-params";
 import { AudioSystem } from "../systems/audio-system";
 import { applySettings, getCurrentAudioSettings, updateAudioSettings } from "../update-audio-settings";
@@ -25,7 +19,9 @@ export function isPositionalAudio(node: AudioObject3D): node is PositionalAudio 
 
 export function cleanupAudio(audio: AudioObject3D) {
   const eid = audio.eid!;
-  audio.disconnect();
+  if (audio.source !== null) {
+    audio.disconnect();
+  }
   const audioSystem = APP.scene?.systems["hubs-systems"].audioSystem;
   APP.audios.delete(eid);
   APP.supplementaryAttenuation.delete(eid);
@@ -40,7 +36,9 @@ function swapAudioType<T extends AudioObject3D>(
   NewType: AudioConstructor<T>
 ) {
   const audio = world.eid2obj.get(eid)! as AudioObject3D;
-  audio.disconnect();
+  if (audio.source !== null) {
+    audio.disconnect();
+  }
   APP.sourceType.set(eid, SourceType.MEDIA_VIDEO);
   APP.supplementaryAttenuation.delete(eid);
   APP.audios.delete(eid);
@@ -71,8 +69,7 @@ export function makeAudioEntity(world: HubsWorld, source: number, sourceType: So
   }
 
   if (sourceType === SourceType.MEDIA_VIDEO) {
-    const videoObj = world.eid2obj.get(source) as Mesh;
-    const video = (videoObj.material as MeshStandardMaterial).map!.image as HTMLVideoElement;
+    const video = MediaVideoData.get(source)!;
     if (video.paused) {
       APP.isAudioPaused.add(eid);
     } else {

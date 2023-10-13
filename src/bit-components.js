@@ -30,6 +30,7 @@ export const MediaFrame = defineComponent({
   scale: [Types.f32, 3],
   mediaType: Types.ui8,
   bounds: [Types.f32, 3],
+  guide: Types.eid,
   preview: Types.eid,
   previewingNid: Types.eid
 });
@@ -123,8 +124,6 @@ export const PhysicsShape = defineComponent({
   heightfieldDistance: Types.f32,
   flags: Types.ui8
 });
-export const Pinnable = defineComponent();
-export const Pinned = defineComponent();
 export const DestroyAtExtremeDistance = defineComponent();
 export const MediaLoading = defineComponent();
 export const FloatyObject = defineComponent({ flags: Types.ui8, releaseGravity: Types.f32 });
@@ -152,10 +151,47 @@ export const CameraTool = defineComponent({
 export const MyCameraTool = defineComponent();
 export const MediaLoader = defineComponent({
   src: Types.ui32,
-  flags: Types.ui8
+  flags: Types.ui8,
+  fileId: Types.ui32
 });
 MediaLoader.src[$isStringType] = true;
+MediaLoader.fileId[$isStringType] = true;
 export const MediaLoaded = defineComponent();
+export const LoadedByMediaLoader = defineComponent();
+export const MediaContentBounds = defineComponent({
+  bounds: [Types.f32, 3]
+});
+export const MediaInfo = defineComponent({
+  accessibleUrl: Types.ui32,
+  contentType: Types.ui32
+});
+MediaInfo.accessibleUrl[$isStringType] = true;
+MediaInfo.contentType[$isStringType] = true;
+
+// MediaImageLoaderData and MediaVideoLoaderData are
+// for parameters that are set at glTF inflators
+// inflateImageLoader and inflateVideoLoader and
+// are needed to be transported to util image/audio loaders.
+// They are handled as part of MediaLoader component data.
+
+/**
+ * @type {Map<EntityId, {
+ *   alphaCutoff: number,
+ *   alphaMode: AlphaMode,
+ *   projection: ProjectionMode
+ * }>}
+ */
+export const MediaImageLoaderData = new Map();
+
+/**
+ * @type {Map<EntityId, {
+ *   loop: boolean,
+ *   autoPlay: boolean,
+ *   controls: boolean,
+ *   projection: ProjectionMode
+ * }>}
+ */
+export const MediaVideoLoaderData = new Map();
 
 export const SceneRoot = defineComponent();
 export const NavMesh = defineComponent();
@@ -163,7 +199,10 @@ export const SceneLoader = defineComponent({ src: Types.ui32 });
 SceneLoader.src[$isStringType] = true;
 
 export const MediaImage = defineComponent({
-  cacheKey: Types.ui32
+  cacheKey: Types.ui32,
+  projection: Types.ui8,
+  alphaMode: Types.ui8,
+  alphaCutoff: Types.f32
 });
 MediaImage.cacheKey[$isStringType] = true;
 
@@ -176,9 +215,36 @@ export const MediaPDF = defineComponent({
 MediaPDF.map = new Map();
 
 export const MediaVideo = defineComponent({
-  autoPlay: Types.ui8
+  ratio: Types.f32,
+  flags: Types.ui8,
+  projection: Types.ui8
 });
-export const AnimationMixer = defineComponent();
+/**
+ * @type {Map<EntityId, HTMLVideoElement}>}
+ */
+export const MediaVideoData = new Map();
+export const MixerAnimatableInitialize = defineComponent({});
+export const MixerAnimatable = defineComponent({});
+/**
+ * @type {Map<EntityId, AnimationMixer}>}
+ */
+export const MixerAnimatableData = new Map();
+export const LoopAnimationInitialize = defineComponent({});
+/**
+ * @type {Map<EntityId, {
+ *          activeClipIndices: number[],
+ *          clip: number,
+ *          paused: boolean,
+ *          startOffset: number,
+ *          timeScale: number
+ *        }[]>}
+ */
+export const LoopAnimationInitializeData = new Map();
+export const LoopAnimation = defineComponent();
+/**
+ * @type {Map<EntityId, AnimationAction[]>}
+ */
+export const LoopAnimationData = new Map();
 export const NetworkedVideo = defineComponent({
   time: Types.f32,
   flags: Types.ui8
@@ -186,11 +252,13 @@ export const NetworkedVideo = defineComponent({
 export const VideoMenuItem = defineComponent();
 export const VideoMenu = defineComponent({
   videoRef: Types.eid,
+  sliderRef: Types.eid,
   timeLabelRef: Types.eid,
   trackRef: Types.eid,
   headRef: Types.eid,
   playIndicatorRef: Types.eid,
-  pauseIndicatorRef: Types.eid
+  pauseIndicatorRef: Types.eid,
+  clearTargetTimer: Types.f64
 });
 export const AudioEmitter = defineComponent({
   flags: Types.ui8
@@ -199,6 +267,7 @@ AudioEmitter.audios = new Map();
 AudioEmitter.params = new Map();
 export const AudioSettingsChanged = defineComponent();
 export const Deletable = defineComponent();
+export const Deleting = defineComponent();
 export const EnvironmentSettings = defineComponent();
 EnvironmentSettings.map = new Map();
 
@@ -218,18 +287,23 @@ export const ObjectMenu = defineComponent({
   rotateButtonRef: Types.eid,
   mirrorButtonRef: Types.eid,
   scaleButtonRef: Types.eid,
-  targetRef: Types.eid
+  targetRef: Types.eid,
+  handlingTargetRef: Types.eid,
+  flags: Types.ui8
 });
 // TODO: Store this data elsewhere, since only one or two will ever exist.
 export const LinkHoverMenu = defineComponent({
   targetObjectRef: Types.eid,
-  linkButtonRef: Types.eid
+  linkButtonRef: Types.eid,
+  clearTargetTimer: Types.f64
 });
 export const LinkHoverMenuItem = defineComponent();
 export const Link = defineComponent({
-  url: Types.ui32
+  url: Types.ui32,
+  type: Types.ui8
 });
 Link.url[$isStringType] = true;
+export const LinkInitializing = defineComponent();
 // TODO: Store this data elsewhere, since only one or two will ever exist.
 export const PDFMenu = defineComponent({
   prevButtonRef: Types.eid,
@@ -238,7 +312,9 @@ export const PDFMenu = defineComponent({
   targetRef: Types.eid,
   clearTargetTimer: Types.f64
 });
-export const ObjectMenuTarget = defineComponent();
+export const ObjectMenuTarget = defineComponent({
+  flags: Types.ui8
+});
 export const NetworkDebug = defineComponent();
 export const NetworkDebugRef = defineComponent({
   ref: Types.eid
@@ -312,4 +388,18 @@ export const LinearScale = defineComponent({
   targetX: Types.f32,
   targetY: Types.f32,
   targetZ: Types.f32
+});
+export const Quack = defineComponent();
+export const TrimeshTag = defineComponent();
+export const HeightFieldTag = defineComponent();
+export const LocalAvatar = defineComponent();
+export const RemoteAvatar = defineComponent();
+export const MediaLink = defineComponent({
+  src: Types.ui32
+});
+MediaLink.src[$isStringType] = true;
+export const ObjectMenuTransform = defineComponent({
+  targetObjectRef: Types.eid,
+  prevObjectRef: Types.eid,
+  flags: Types.ui8
 });
