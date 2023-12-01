@@ -12,10 +12,11 @@ import {
   ObjectMenuTarget,
   RemoteRight,
   Rigidbody,
-  MediaContentBounds,
-  Deleting
+  Deleting,
+  Deletable,
+  MediaContentBounds
 } from "../bit-components";
-import { anyEntityWith, findAncestorWithComponents } from "../utils/bit-utils";
+import { anyEntityWith, findAncestorWithComponent, findAncestorWithComponents } from "../utils/bit-utils";
 import { createNetworkedEntity } from "../utils/create-networked-entity";
 import HubChannel from "../utils/hub-channel";
 import type { EntityID } from "../utils/networking-types";
@@ -49,12 +50,11 @@ function objectMenuTarget(world: HubsWorld, menu: EntityID, sceneIsFrozen: boole
   }
 
   // We can have more than one object menu target in the object hierarchy so we need to explicity look
-  // for the media loader entity here. ie. The object menu target in the media loader entity and the
-  // video menu in the video entity
-  // TODO We should use something more meaningful than MediaContentBounds for the media loader root entity
-  // or rename that to something like MediaRoot
+  // for the root media loader entity.
+  // We should probably use something more meaningful to refer to that spawned media root than Deletable.
+  // Maybe something like MediaRoot or SpawnedMediaRoot.
   const target = hoveredQuery(world).map(eid =>
-    findAncestorWithComponents(world, [MediaContentBounds, ObjectMenuTarget], eid)
+    findAncestorWithComponents(world, [Deletable, ObjectMenuTarget], eid)
   )[0];
   if (target) {
     if (hasComponent(world, Deleting, target)) {
@@ -221,7 +221,8 @@ function handleHeldExit(world: HubsWorld, eid: EntityID, menuEid: EntityID) {
 }
 
 function updateVisibility(world: HubsWorld, menu: EntityID, frozen: boolean) {
-  const target = ObjectMenu.targetRef[menu];
+  if (!APP.hubChannel) return;
+  let target = ObjectMenu.targetRef[menu];
   const visible = !!(target && frozen) && (ObjectMenu.flags[menu] & ObjectMenuFlags.Visible) !== 0;
 
   // TODO We are handling menus visibility in a similar way for all the object menus, we
@@ -236,17 +237,33 @@ function updateVisibility(world: HubsWorld, menu: EntityID, frozen: boolean) {
   const obj = world.eid2obj.get(menu)!;
   obj.visible = visible;
 
+  // We need the media loader entity as that's the entity that's actually pinned and we
+  // need to check its state to show/hide certain buttons
+  // TODO At this moment all objects that have an object menu have been loaded by a media loader
+  // but this might not be true in the future if we allow adding object menus to arbitrary objects.
+  const mediaLoader = findAncestorWithComponent(world, MediaContentBounds, target);
+  target = mediaLoader ? mediaLoader : target;
+
+  const canISpawnMove = APP.hubChannel.can("spawn_and_move_media");
+  const canIPin = !!(target && canPin(APP.hubChannel, target));
+  const isEntityPinned = isPinned(target);
+
   // Parent visibility doesn't block raycasting, so we must set each button to be invisible
   // TODO: Ensure that children of invisible entities aren't raycastable
-  world.eid2obj.get(ObjectMenu.unpinButtonRef[menu])!.visible = visible && isPinned(target);
-  world.eid2obj.get(ObjectMenu.pinButtonRef[menu])!.visible =
-    visible && !isPinned(target) && canPin(APP.hubChannel!, target);
-  world.eid2obj.get(ObjectMenu.removeButtonRef[menu])!.visible =
-    visible && !isPinned(target) && APP.hubChannel!.can("spawn_and_move_media");
-  world.eid2obj.get(ObjectMenu.cloneButtonRef[menu])!.visible = visible && APP.hubChannel!.can("spawn_and_move_media");
-  world.eid2obj.get(ObjectMenu.rotateButtonRef[menu])!.visible = visible && APP.hubChannel!.can("spawn_and_move_media");
-  world.eid2obj.get(ObjectMenu.scaleButtonRef[menu])!.visible = visible && APP.hubChannel!.can("spawn_and_move_media");
+  world.eid2obj.get(ObjectMenu.unpinButtonRef[menu])!.visible = visible && isEntityPinned && canIPin;
+  world.eid2obj.get(ObjectMenu.pinButtonRef[menu])!.visible = visible && !isEntityPinned && canIPin;
+  world.eid2obj.get(ObjectMenu.removeButtonRef[menu])!.visible = visible && !isEntityPinned && canISpawnMove;
+  world.eid2obj.get(ObjectMenu.cloneButtonRef[menu])!.visible = visible && canISpawnMove;
+  world.eid2obj.get(ObjectMenu.rotateButtonRef[menu])!.visible =
+    visible && (!isEntityPinned || canIPin) && canISpawnMove;
+  world.eid2obj.get(ObjectMenu.scaleButtonRef[menu])!.visible =
+    visible && (!isEntityPinned || canIPin) && canISpawnMove;
   world.eid2obj.get(ObjectMenu.openLinkButtonRef[menu])!.visible = visible;
+
+  // This is a hacky way of giving a chance to the object-menu-transform system to center the menu based on the
+  // visible buttons without accounting for the background plane.
+  const same = ObjectMenuTransform.prevObjectRef[menu] === ObjectMenuTransform.targetObjectRef[menu];
+  world.eid2obj.get(ObjectMenu.backgroundRef[menu])!.visible = visible && same;
 
   // Hide unimplemented features for now.
   // TODO: Implement and show the buttons.
